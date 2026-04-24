@@ -12,24 +12,38 @@ PROJECT_ROOT = BASE_DIR.parent.parent
 load_dotenv(os.path.join(PROJECT_ROOT, '.env'))
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.getenv('DEBUG', 'False')
+DEBUG = os.getenv('DEBUG', 'False').lower() in ['true', '1', 'yes']
 
-ALLOWED_HOSTS = ['localhost', '127.0.0.1', '0.0.0.0']
+# Railway deployment - get allowed hosts from environment
+ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1,0.0.0.0').split(',')
 
-# Database configuration
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.mysql',
-        'NAME': os.getenv('DB_NAME', 'aura_ai'),
-        'USER': os.getenv('DB_USER', 'root'),
-        'PASSWORD': os.getenv('DB_PASSWORD', ''),
-        'HOST': os.getenv('DB_HOST', 'localhost'),
-        'PORT': os.getenv('DB_PORT', '3306'),
-        'OPTIONS': {
-            'charset': 'utf8mb4',
-        },
+# Add Railway's default domain
+if 'RAILWAY_STATIC_URL' in os.environ:
+    railway_domain = os.environ['RAILWAY_STATIC_URL'].replace('https://', '').replace('http://', '')
+    ALLOWED_HOSTS.append(railway_domain)
+
+# Database configuration - Support both MySQL and PostgreSQL for Railway
+if os.getenv('DATABASE_URL'):
+    # Railway PostgreSQL database
+    import dj_database_url
+    DATABASES = {
+        'default': dj_database_url.parse(os.getenv('DATABASE_URL'))
     }
-}
+else:
+    # MySQL configuration for local development
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.mysql',
+            'NAME': os.getenv('DB_NAME', 'aura_ai'),
+            'USER': os.getenv('DB_USER', 'root'),
+            'PASSWORD': os.getenv('DB_PASSWORD', ''),
+            'HOST': os.getenv('DB_HOST', 'localhost'),
+            'PORT': os.getenv('DB_PORT', '3306'),
+            'OPTIONS': {
+                'charset': 'utf8mb4',
+            },
+        }
+    }
 
 # Application definition
 INSTALLED_APPS = [
@@ -97,13 +111,14 @@ SIMPLE_JWT = {
     'SIGNING_KEY': os.getenv('JWT_SECRET_KEY', 'your-secret-key-here'),
 }
 
-# CORS Configuration
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-    "http://localhost:5173",
-    "https://yourbrandai.com",  # Update this to your domain
-]
+# CORS Configuration - Support both development and production
+cors_origins = os.getenv('CORS_ALLOWED_ORIGINS', 'http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173')
+CORS_ALLOWED_ORIGINS = [origin.strip() for origin in cors_origins.split(',') if origin.strip()]
+
+# Add Railway frontend URL if available
+if 'RAILWAY_PUBLIC_DOMAIN' in os.environ:
+    railway_frontend = f"https://{os.environ['RAILWAY_PUBLIC_DOMAIN']}"
+    CORS_ALLOWED_ORIGINS.append(railway_frontend)
 
 CORS_ALLOW_CREDENTIALS = True
 
